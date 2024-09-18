@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "863211081530",
+    "project_id": "mediaaccess-56cd3",
+    "storage_bucket": "mediaaccess-56cd3.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:863211081530:android:09a640f1592fc664310a03",
+        "android_client_info": {
+          "package_name": "com.google.firebase.MediaAccess"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASWNZEVK6ZDwYNMCbWKxQf9Wlj-r_B1RQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:863211081530:android:26b0f874dbc7eaf0310a03",
+        "android_client_info": {
+          "package_name": "comp5216.sydney.edu.au.mediaaccess"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyASWNZEVK6ZDwYNMCbWKxQf9Wlj-r_B1RQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
