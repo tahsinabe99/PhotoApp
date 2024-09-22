@@ -41,6 +41,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -49,7 +50,10 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Consumer;
+
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 
 
 public class MainActivity extends Activity {
@@ -84,6 +88,14 @@ public class MainActivity extends Activity {
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
     private boolean mLocationPermissionGranted = false;
     private String cityName;
+    //private UploadWorker worker;
+
+    private FirebaseStorage mStorage;
+    private  StorageReference mstorageRef;
+    private FirebaseFirestore mFirestore;
+
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,7 +104,23 @@ public class MainActivity extends Activity {
         mFusedLocationProviderClient= LocationServices.getFusedLocationProviderClient(this);
         //mapsActivity=new MapsActivity(this);
         getLocationPermission();
+        initFirestore();
+        initStorageReference();
+
+
     }
+
+    private void initFirestore() {
+        // TODO(developer): Implement
+        mStorage=FirebaseStorage.getInstance();
+        mFirestore=FirebaseFirestore.getInstance();
+    }
+
+    private void initStorageReference(){
+        mstorageRef=mStorage.getReference();
+    }
+
+
 
     public void onLoadPhotoClick(View view) {
 
@@ -101,7 +129,6 @@ public class MainActivity extends Activity {
 
         // Bring up gallery to select a photo
         startActivityForResult(intent, MY_PERMISSIONS_REQUEST_READ_PHOTOS);
-
     }
 
     public void onLoadVideoClick(View view) {
@@ -126,30 +153,29 @@ public class MainActivity extends Activity {
                     return;
                 }
 
-            // create Intent to take a picture and return control to the calling application
-            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                // create Intent to take a picture and return control to the calling application
+                Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
 
-            // set file name
+                // set file name
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
 
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-//            photoFileName = "IMG_" + timeStamp + ".jpg";
+                photoFileName = "IMG_" +"_"+timeStamp+"_CityName_"+ cityName+"_LAT_"+mLastKnownLocation.getLatitude()+"_LON_"+ mLastKnownLocation.getLongitude() + ".jpg";
+                Log.d(TAG, "photoFileName");
+                Log.d(TAG, photoFileName);
+                this.cityName=cityName;
 
-            photoFileName = "IMG_" +"_"+timeStamp+"_CityName_"+ cityName+"_LAT_"+mLastKnownLocation.getLatitude()+"_LON_"+ mLastKnownLocation.getLongitude() + ".jpg";
-            Log.d(TAG, "photoFileName");
-            Log.d(TAG, photoFileName);
+                // Create a photo file reference
+                Uri file_uri = getFileUri(photoFileName, 0);
 
-            // Create a photo file reference
-            Uri file_uri = getFileUri(photoFileName, 0);
+                // Add extended data to the intent
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, file_uri);
 
-            // Add extended data to the intent
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, file_uri);
-
-            // If you call startActivityForResult() using an intent that no app can handle, your app will crash.
-            // So as long as the result is not null, it's safe to use the intent.
-            if (intent.resolveActivity(getPackageManager()) != null) {
-                // Start the image capture intent to take photo
-                startActivityForResult(intent, MY_PERMISSIONS_REQUEST_OPEN_CAMERA);
-            }
+                // If you call startActivityForResult() using an intent that no app can handle, your app will crash.
+                // So as long as the result is not null, it's safe to use the intent.
+                if (intent.resolveActivity(getPackageManager()) != null) {
+                    // Start the image capture intent to take photo
+                    startActivityForResult(intent, MY_PERMISSIONS_REQUEST_OPEN_CAMERA);
+                }
             });
         }
     }
@@ -165,21 +191,21 @@ public class MainActivity extends Activity {
                     Log.e(TAG, "Location is not available. Cannot proceed with photo.");
                     return;
                 }
-            // create Intent to capture a video and return control to the calling application
-            Intent intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+                // create Intent to capture a video and return control to the calling application
+                Intent intent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
 
-            // set file name
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
-             videoFileName = "VIDEO_"+timeStamp+"_CityName_"+ cityName+"_LAT_"+mLastKnownLocation.getLatitude()+"_LON_"+ mLastKnownLocation.getLongitude() + ".mp4";
+                // set file name
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+                videoFileName = "VIDEO_"+timeStamp+"_CityName_"+ cityName+"_LAT_"+mLastKnownLocation.getLatitude()+"_LON_"+ mLastKnownLocation.getLongitude() + ".mp4";
+                this.cityName=cityName;
+                // Create a video file reference
+                Uri file_uri = getFileUri(videoFileName, 1);
 
-            // Create a video file reference
-            Uri file_uri = getFileUri(videoFileName, 1);
+                // add extended data to the intent
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, file_uri);
 
-            // add extended data to the intent
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, file_uri);
-
-            // Start the video record intent to capture video
-            startActivityForResult(intent, MY_PERMISSIONS_REQUEST_RECORD_VIDEO);
+                // Start the video record intent to capture video
+                startActivityForResult(intent, MY_PERMISSIONS_REQUEST_RECORD_VIDEO);
             });
         }
     }
@@ -254,51 +280,74 @@ public class MainActivity extends Activity {
         ivPreview.setVisibility(View.GONE);
 
         if (requestCode == MY_PERMISSIONS_REQUEST_OPEN_CAMERA) {
-            if (resultCode == RESULT_OK) {
+            if (resultCode == RESULT_OK && file!=null && file.exists()) {
                 // by this point we have the camera photo on disk
                 Bitmap takenImage = BitmapFactory.decodeFile(file.getAbsolutePath());
                 scanFile(file.getAbsolutePath());
                 ivPreview.setImageBitmap(takenImage);
                 ivPreview.setVisibility(View.VISIBLE);
+
+                //upload to firebase
+                Uri imageUri=Uri.fromFile(file);
+//                StorageReference imageRef=mstorageRef.child("image/" + file.getName());
+                if (file.exists()) {
+                    StorageReference imageRef = mstorageRef.child("images/"+this.cityName+"/"+ file.getName());
+                    Log.d("UploadDebug", "Uploading file: " + file.getAbsolutePath());
+                    uploadToFirebase(imageRef, Uri.fromFile(file));
+
+                } else {
+                    Log.e("FileError", "File does not exist: " + file.getAbsolutePath());
+
+                }
             } else { // Result was a failure
                 Toast.makeText(this, "Picture wasn't taken!", Toast.LENGTH_SHORT).show();
             }
         } else if (requestCode == MY_PERMISSIONS_REQUEST_READ_PHOTOS) {
-            if (resultCode == RESULT_OK) {
-                  Uri photoUri = data.getData();
+            if (resultCode == RESULT_OK && data!=null) {
+                Uri photoUri = data.getData();
                 // Do something with the photo based on Uri
-                Bitmap selectedImage;
-                try {
-                    selectedImage = MediaStore.Images.Media.getBitmap(this.getContentResolver(), photoUri);
+                if (photoUri !=null){
+                    Bitmap selectedImage;
+                    try {
+                        selectedImage = MediaStore.Images.Media.getBitmap(this.getContentResolver(), photoUri);
 
-                    // Load the selected image into a preview
-                    ivPreview.setImageBitmap(selectedImage);
-                    ivPreview.setVisibility(View.VISIBLE);
-                } catch (FileNotFoundException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
+                        // Load the selected image into a preview
+                        ivPreview.setImageBitmap(selectedImage);
+                        ivPreview.setVisibility(View.VISIBLE);
+                    } catch (FileNotFoundException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
                 }
+
             }
         } else if (requestCode == MY_PERMISSIONS_REQUEST_READ_VIDEOS) {
-            if (resultCode == RESULT_OK) {
+            if (resultCode == RESULT_OK && data!=null) {
                 Uri videoUri = data.getData();
-                mVideoView.setVisibility(View.VISIBLE);
-                mVideoView.setVideoURI(videoUri);
-                mVideoView.requestFocus();
-                mVideoView.setOnPreparedListener(new OnPreparedListener() {
-                    // Close the progress bar and play the video
-                    public void onPrepared(MediaPlayer mp) {
-                        mVideoView.start();
-                    }
-                });
+                if(videoUri!=null){
+                    mVideoView.setVisibility(View.VISIBLE);
+                    mVideoView.setVideoURI(videoUri);
+                    mVideoView.requestFocus();
+                    mVideoView.setOnPreparedListener(new OnPreparedListener() {
+                        // Close the progress bar and play the video
+                        public void onPrepared(MediaPlayer mp) {
+                            mVideoView.start();
+                        }
+                    });
+
+//                    StorageReference videoRef = mstorageRef.child("videos/" + videoFileName);
+//                    uploadToFirebase(videoRef, videoUri);
+                }
+
             }
         } else if (requestCode == MY_PERMISSIONS_REQUEST_RECORD_VIDEO) {
             //if you are running on emulator remove the if statement
-            if (resultCode == RESULT_OK) {
+            if (resultCode == RESULT_OK && videoFileName!=null) {
                 Uri takenVideoUri = getFileUri(videoFileName, 1);
+
                 scanFile(file.getAbsolutePath());
                 mVideoView.setVisibility(View.VISIBLE);
                 mVideoView.setVideoURI(takenVideoUri);
@@ -309,8 +358,29 @@ public class MainActivity extends Activity {
                         mVideoView.start();
                     }
                 });
+
+                if (file.exists()) {
+                    StorageReference videoRef = mstorageRef.child("videos/" +this.cityName+"/"+cityName+ videoFileName);
+                    Log.d("UploadDebug", "Uploading file: " + file.getAbsolutePath());
+                    uploadToFirebase(videoRef, takenVideoUri);
+
+                } else {
+                    Log.e("FileError", "File does not exist: " + file.getAbsolutePath());
+
+                }
             }
         }
+    }
+
+    private void uploadToFirebase(StorageReference storageReference, Uri fileUri) {
+        storageReference.putFile(fileUri)
+                .addOnSuccessListener(taskSnapshot -> {
+                    Toast.makeText(this, "Upload successful", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.i("Upload Failed me", "AGHHHHHHHHHH");
+                    Toast.makeText(this, "Upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
 
     public void getLocationPermission() {
