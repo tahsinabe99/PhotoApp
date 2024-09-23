@@ -12,9 +12,9 @@ import android.graphics.BitmapFactory;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnPreparedListener;
-import android.media.MediaRecorder;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
@@ -24,7 +24,6 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.VideoView;
 
@@ -35,10 +34,9 @@ import androidx.core.content.FileProvider;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
+
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
+
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -52,8 +50,10 @@ import java.util.List;
 import java.util.Locale;
 
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
-import com.google.firebase.storage.UploadTask;
+
+
 
 
 public class MainActivity extends Activity {
@@ -63,7 +63,6 @@ public class MainActivity extends Activity {
     private static final int MY_PERMISSIONS_REQUEST_READ_PHOTOS = 102;
     private static final int MY_PERMISSIONS_REQUEST_RECORD_VIDEO = 103;
     private static final int MY_PERMISSIONS_REQUEST_READ_VIDEOS = 104;
-    private static final int MY_PERMISSIONS_REQUEST_RECORD_AUDIO = 105;
     public final String APP_TAG = "MobileComputingTutorial";
     public String photoFileName = "photo.jpg";
     public String videoFileName = "video.mp4";
@@ -72,13 +71,9 @@ public class MainActivity extends Activity {
 
 
     private File file;
-    private final MediaRecorder recorder = null;
-    private final MediaPlayer player = null;
-    //private MapsActivity mapsActivity;
 
-    private TextView locationTextView;
-    //private static final String TAG = MapsActivity.class.getSimpleName();
-    // The entry point to the Fused Location Provider.
+
+
     private FusedLocationProviderClient mFusedLocationProviderClient;
     // The geographical location where the device is currently located. That is, the last-known location retrieved by the Fused Location Provider.
     private Location mLastKnownLocation = new Location("");
@@ -88,7 +83,9 @@ public class MainActivity extends Activity {
     private static final int PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
     private boolean mLocationPermissionGranted = false;
     private String cityName;
-    //private UploadWorker worker;
+    private String longitude;
+    private String latitude;
+
 
     private FirebaseStorage mStorage;
     private  StorageReference mstorageRef;
@@ -102,7 +99,6 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_week05);
         mFusedLocationProviderClient= LocationServices.getFusedLocationProviderClient(this);
-        //mapsActivity=new MapsActivity(this);
         getLocationPermission();
         initFirestore();
         initStorageReference();
@@ -126,6 +122,8 @@ public class MainActivity extends Activity {
 
         // Create intent for picking a photo from the gallery
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        Toast.makeText(this, "Clicking on picture will trigger firebase upload", Toast.LENGTH_LONG).show();
+
 
         // Bring up gallery to select a photo
         startActivityForResult(intent, MY_PERMISSIONS_REQUEST_READ_PHOTOS);
@@ -135,6 +133,7 @@ public class MainActivity extends Activity {
 
         // Create intent for picking a video from the gallery
         Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
+        Toast.makeText(this, "Clicking on video will trigger firebase upload", Toast.LENGTH_LONG).show();
 
         // Bring up gallery to select a video
         startActivityForResult(intent, MY_PERMISSIONS_REQUEST_READ_VIDEOS);
@@ -143,8 +142,9 @@ public class MainActivity extends Activity {
 
     public void onTakePhotoClick(View v) {
         // Check permissions
-        if (!marshmallowPermission.checkPermissionForCamera()) {
+        if (!marshmallowPermission.checkPermissionForCamera() && !mLocationPermissionGranted) {
             marshmallowPermission.requestPermissionForCamera();
+            getLocationPermission();
         } else {
 
             getDeviceLocation(() -> {
@@ -163,9 +163,14 @@ public class MainActivity extends Activity {
                 Log.d(TAG, "photoFileName");
                 Log.d(TAG, photoFileName);
                 this.cityName=cityName;
+                this.latitude=String.valueOf(mLastKnownLocation.getLatitude());
+                this.longitude=String.valueOf(mLastKnownLocation.getLongitude());
+
+
 
                 // Create a photo file reference
                 Uri file_uri = getFileUri(photoFileName, 0);
+
 
                 // Add extended data to the intent
                 intent.putExtra(MediaStore.EXTRA_OUTPUT, file_uri);
@@ -209,6 +214,7 @@ public class MainActivity extends Activity {
             });
         }
     }
+
 
     // Returns the Uri for a photo/media stored on disk given the fileName
     public Uri getFileUri(String fileName) {
@@ -291,7 +297,13 @@ public class MainActivity extends Activity {
                 Uri imageUri=Uri.fromFile(file);
 //                StorageReference imageRef=mstorageRef.child("image/" + file.getName());
                 if (file.exists()) {
+                    StorageMetadata metadata = new StorageMetadata.Builder()
+                            .setCustomMetadata("latitude", String.valueOf(this.latitude))
+                            .setCustomMetadata("longitude", String.valueOf(this.longitude))
+                            .setCustomMetadata("city",cityName)  // Add the city name
+                            .build();
                     StorageReference imageRef = mstorageRef.child("images/"+this.cityName+"/"+ file.getName());
+                    imageRef.putFile(imageUri, metadata);
                     Log.d("UploadDebug", "Uploading file: " + file.getAbsolutePath());
                     uploadToFirebase(imageRef, Uri.fromFile(file));
 
@@ -310,6 +322,7 @@ public class MainActivity extends Activity {
                     Bitmap selectedImage;
                     try {
                         selectedImage = MediaStore.Images.Media.getBitmap(this.getContentResolver(), photoUri);
+
 
                         // Load the selected image into a preview
                         ivPreview.setImageBitmap(selectedImage);
@@ -347,6 +360,7 @@ public class MainActivity extends Activity {
             //if you are running on emulator remove the if statement
             if (resultCode == RESULT_OK && videoFileName!=null) {
                 Uri takenVideoUri = getFileUri(videoFileName, 1);
+                Uri videoUri=Uri.fromFile(file);
 
                 scanFile(file.getAbsolutePath());
                 mVideoView.setVisibility(View.VISIBLE);
@@ -361,6 +375,12 @@ public class MainActivity extends Activity {
 
                 if (file.exists()) {
                     StorageReference videoRef = mstorageRef.child("videos/" +this.cityName+"/"+cityName+ videoFileName);
+                    StorageMetadata metadata = new StorageMetadata.Builder()
+                            .setCustomMetadata("latitude", String.valueOf(this.latitude))
+                            .setCustomMetadata("longitude", String.valueOf(this.longitude))
+                            .setCustomMetadata("city",cityName)  // Add the city name
+                            .build();
+                    videoRef.putFile(videoUri, metadata);
                     Log.d("UploadDebug", "Uploading file: " + file.getAbsolutePath());
                     uploadToFirebase(videoRef, takenVideoUri);
 
@@ -411,7 +431,7 @@ public class MainActivity extends Activity {
                 locationResult.addOnCompleteListener(this, new OnCompleteListener<Location>() {
                     @Override
                     public void onComplete(@NonNull Task<Location> task) {
-                        if (task.isSuccessful()) {
+                        if (task.isSuccessful() && task.getResult()!=null) {
                             // Obtain the current location of the device
                             mLastKnownLocation = task.getResult();
                             double latitude=mLastKnownLocation.getLatitude();
@@ -422,11 +442,6 @@ public class MainActivity extends Activity {
 
                             String currentOrDefault = "Current";
 
-//                            // Show location details on the location TextView
-//                            String msg = currentOrDefault + " Location: " +
-//                                    Double.toString(mLastKnownLocation.getLatitude()) + ", " +
-//                                    Double.toString(mLastKnownLocation.getLongitude());
-//                            locationTextView.setText(msg);
 
                             // Add a marker for my current location on the ma
                         } else {
@@ -445,6 +460,7 @@ public class MainActivity extends Activity {
             Log.e("Exception: %s", e.getMessage());
         }
     }
+
 
 
     private String getCityNameFromCoordinates(double latitude, double longitude) {
@@ -467,7 +483,5 @@ public class MainActivity extends Activity {
         }
         return cityName;
     }
-
-
 
 }
