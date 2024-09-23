@@ -203,6 +203,8 @@ public class MainActivity extends Activity {
                 String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
                 videoFileName = "VIDEO_"+timeStamp+"_CityName_"+ cityName+"_LAT_"+mLastKnownLocation.getLatitude()+"_LON_"+ mLastKnownLocation.getLongitude() + ".mp4";
                 this.cityName=cityName;
+                this.latitude=String.valueOf(mLastKnownLocation.getLatitude());
+                this.longitude=String.valueOf(mLastKnownLocation.getLongitude());
                 // Create a video file reference
                 Uri file_uri = getFileUri(videoFileName, 1);
 
@@ -305,7 +307,7 @@ public class MainActivity extends Activity {
                     StorageReference imageRef = mstorageRef.child("images/"+this.cityName+"/"+ file.getName());
                     imageRef.putFile(imageUri, metadata);
                     Log.d("UploadDebug", "Uploading file: " + file.getAbsolutePath());
-                    uploadToFirebase(imageRef, Uri.fromFile(file));
+                    uploadToFirebase(imageRef, imageUri);
 
                 } else {
                     Log.e("FileError", "File does not exist: " + file.getAbsolutePath());
@@ -374,6 +376,9 @@ public class MainActivity extends Activity {
                 });
 
                 if (file.exists()) {
+
+
+
                     StorageReference videoRef = mstorageRef.child("videos/" +this.cityName+"/"+cityName+ videoFileName);
                     StorageMetadata metadata = new StorageMetadata.Builder()
                             .setCustomMetadata("latitude", String.valueOf(this.latitude))
